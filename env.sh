@@ -50,6 +50,7 @@ pip install \
     sortedcontainers==2.4.0 \
     configargparse==1.2.3 \
     tqdm==4.48.2 \
+    protobuf==3.20.1 \
     termcolor==1.0.0
 
 # common data science libs
@@ -65,12 +66,13 @@ pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0+cu1
 
 # transformers bloom dev branch
 pip install https://github.com/younesbelkada/transformers/archive/ba1d9fc05fda160bda968cc77c4c5dbb21049aa9.zip
-pip install datasets==2.2.2
+pip install datasets==2.2.2 accelerate==0.9.0 fairscale==0.4.6
 
 # domain-specific ML libs
 pip install \
     sentencepiece==0.1.96 \
     nltk==3.6.2 \
+    scikit-learn==1.1.1 \
     gensim==4.0.1 \
     sacrebleu==1.5.1 \
     sacremoses==0.0.45 \
