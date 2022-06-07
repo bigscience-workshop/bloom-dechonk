@@ -1,17 +1,9 @@
-# Import libraries
 import argparse
 import os
 from copy import deepcopy
 
 import torch
 from transformers import BloomConfig, BloomModel
-
-model_name = "bigscience/bloom-6b3"
-output_model_name = "bloom-6b3-shrinked"
-downsampling_rate = 0.25
-aggregation_strategy = "mean"
-layer_selection_strategy = "step"
-push_to_hub = True
 
 
 def count_parameters(model):
@@ -21,7 +13,35 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 def select_layers_from_strategy(strategy, n_layers, downsampling_rate):
-    selecting_rate = int(1/(2*downsampling_rate))
+    """
+        Given the downsampling strategy, the number of layers and the downsampling rate
+        Return a dictionary that maps the layers we want to select from the source model 
+        to the layers we want to assign on the shriked model, in the format
+        {source_model_key:target_model_key, ... }
+        Note that this is applied only on the attention block layers (named as `h` in `BloomModel`)
+
+        Example:
+            downsampling rate = 0.5 (ie consider half of the layers)
+            Source Model: 
+                h.0 | h.1 | ... | h.30
+            Target Model:
+                if strategy = 'first':
+                    returns {h.0:h.0, h.1:h.1, ... h.14:h.14} (consider half of the layers)
+                if strategy = 'last':
+                    returns {h.15:h.0, h.16:h.0, ... , h.30:h.14}
+                    So h.15 of the source model will correspond to h.0 in the target model, etc.
+                if strategy = 'step':
+                    returns {h.0:h.0, h.2:h.1, h.4:h.0, ... , h.30:h.14}
+                    We consider the layers of the source model with a step of 1/downsample_rate
+        Args:
+            strategy (`str`, *required*):
+                layer selection strategy, must be `first`, `last` or `step` (see comments above)
+            n_layers (`int`, *required*):
+                total number of layers in the source model
+            downsampling_rate (`float`, *required*):
+                width downsampling rate
+    """
+    selecting_rate = int(1/(downsampling_rate))
 
     if strategy == "first":
         array_layers = ["h."+str(i) for i in range(selecting_rate)]
@@ -33,22 +53,58 @@ def select_layers_from_strategy(strategy, n_layers, downsampling_rate):
         raise NotImplementedError("Unknown strategy: {}".format(strategy))
     return {layer:"h."+str(i) for i, layer in enumerate(array_layers)}
 
-def convert_config_to_downsized_config(config, downsampling_rate, aggregation_strategy, layer_selection_strategy):
+def convert_config_to_downsized_config(config, hidden_size_downsampling_rate, width_downsampling_rate, aggregation_strategy, layer_selection_strategy):
     """
-        Step1: Define the new hyperparameters given the source model and the downsampling rate. This is done in the config file
+        Defines the new hyperparameters of the shrinked model, given the downsampling rates.
+        Creates a new config file and returns it.
+        Args:
+            config (`transformers.BloomConfig`, *required*):
+                input old model's config
+            hidden_downsampling_rate (`float`, *required*):
+                hidden states downsampling rate
+            width_downsampling_rate (`float`, *required*):
+                width downsampling rate
+            aggregation_strategy (`str`, *required*):
+                weights matrices aggregation strategy
+            layer_selection_strategy (`str`, *required*):
+                layer selection strategy - see the function `select_layers_from_strategy` for more details
     """
-    old_hidden_size, old_num_layer = config.hidden_size, config.n_layer
+    old_hidden_size, old_num_layer, old_num_heads = config.hidden_size, config.n_layer, config.n_head
     
     downsized_config = deepcopy(config)
-    downsized_config.downsampling_rate = downsampling_rate
-    downsized_config.hidden_size = int(old_hidden_size * downsampling_rate * 2)
-    downsized_config.n_layer = int(old_num_layer * downsampling_rate * 2)
+    downsized_config.hidden_size_downsampling_rate = hidden_size_downsampling_rate
+    downsized_config.width_downsampling_rate = width_downsampling_rate
+    
+    downsized_config.hidden_size = int(old_hidden_size * hidden_size_downsampling_rate)
+    downsized_config.n_layer = int(old_num_layer * width_downsampling_rate)
+    downsized_config.n_head = int(old_num_heads * hidden_size_downsampling_rate)
+
     downsized_config.weights_aggregation_strategy = aggregation_strategy
     downsized_config.layer_selection_strategy = layer_selection_strategy
-
     return downsized_config
 
 def select_keys_from_state_dict(state_dict, dict_layers):
+    """
+        Given the old model's state dict and a dictionnary that maps 
+        which layer to keep for the shrinked model, returns the preprocessed 
+        state dict
+        Example:
+            Source state_dict.keys() contain:
+                word_embeddings.weight, h.0.self_attention.qkv.weight, h.1.self_attention.qkv.weight, ... , 
+                h.30.self_attention.qkv.weight
+            dict_layers:
+                {h.0:h.0, h.2:h.1, ... , h.30:h.14}
+            Returned state_dict.keys() will contain:
+                word_embeddings.weight, h.0.self_attention.qkv.weight, h.1.self_attention.qkv.weight, ... , 
+                h.14.self_attention.qkv.weight - with h.1.self_attention.qkv.weight corresponding to h.2.self_attention.qkv.weight,
+                and h.14.self_attention.qkv.weight corresponding to h.30.self_attention.qkv.weight etc.
+            
+        Args:
+            state_dict (`torch.state_dict`, *required*):
+                input old model's state_dict
+            dict_layers (`Dict[`str`, `str`], *required*):
+                dictionary mapping the keys we want to keep for the layers
+    """
     processed_state_dict = {}
     for key in state_dict.keys():
         if key.startswith("h."):
@@ -63,6 +119,15 @@ def select_keys_from_state_dict(state_dict, dict_layers):
 def map_key_to_downsized_model(hidden_size, key):
     """
         This function maps the key of the old model to the corresponding new dimensions of the new model
+
+        Args:
+            hidden_size (`int`, *required*):
+                Targed downsampled hidden_size.
+            key (`str`, *required*):
+                model state dict key that needs to be processed
+        Returns:
+            splitting_dimensions (`Tuple[`int`, `int`]`):
+                Desired target weight matrix dimension for the corresponding input key.
     """
     if key.endswith("dense.weight"):
         splitting_dimensions = (hidden_size, hidden_size)
@@ -81,7 +146,7 @@ def map_key_to_downsized_model(hidden_size, key):
     return splitting_dimensions
 
 
-def process_weights(weights, aggregation_strategy, downsampling_rate, splitting_dimensions=1):
+def process_weights(weights, aggregation_strategy, splitting_dimensions):
     """
         This function takes the weights of the old model and downsamples them to the new model's dimensions
     """
@@ -90,12 +155,12 @@ def process_weights(weights, aggregation_strategy, downsampling_rate, splitting_
         splitted_tensor = torch.stack(weights.split(splitting_size, dim=-1))
     elif len(splitting_dimensions) == 2:
         splitting_size_x, splitting_size_y = splitting_dimensions
-        n_folds = int(1/downsampling_rate)
         for i, splitting_size in enumerate(splitting_dimensions):
             if i == 0:
                 splitted_tensor = torch.stack(weights.split(splitting_size, dim=0))
             else:
                 splitted_tensor = torch.stack(splitted_tensor.split(splitting_size, dim=-1))
+        n_folds = splitted_tensor.shape[0] * splitted_tensor.shape[1]
         splitted_tensor = splitted_tensor.contiguous().view(n_folds, splitting_size_x, splitting_size_y)
 
     if aggregation_strategy == "mean":
@@ -107,40 +172,71 @@ def process_weights(weights, aggregation_strategy, downsampling_rate, splitting_
     else:
         raise ValueError("Unknown aggregation strategy: {}".format(aggregation_strategy))
 
-def downsize_state_dict(state_dict, downsized_model_config, downsampling_rate, aggregation_strategy="mean"):
+def downsize_state_dict(state_dict, downsized_model_config, aggregation_strategy="mean"):
     """
-        The state dict needs to be pre-processed by popping the keys that are not needed (aka the layers that we want to discard)
-        Step5: Load the source model's weights into the new model and save the new model. Let the user define the aggregation strategy
+        Take the old model's state dict and downsize it. The state dict should be already preprocessed
+        by the function `select_keys_from_state_dict` that will select only the relevant keys (relevant layers)
+        Args:
+            state_dict (`torch.state_dict`, *required*):
+                input state dict of the old model
+            downsized_model_config (`transformers.BloomConfig`, *required*):
+                config class of the shrinked model
+            aggregation_strategy (`str`, *required*):
+                aggregation strategy for the weights matrices. We first divide the weights matrix
+                into (1/(down_sampling_rate**2)) chunks for linear weights and (1/downsampling_rate)
+                for bias terms
+                - "first": Select only the first chunk
+                - "last": Select only the last chunk
+                - "mean": Average all the chunks 
     """
     downsized_state_dict = {}
     for key in state_dict.keys():
         splitting_dimensions = map_key_to_downsized_model(downsized_model_config.hidden_size, key)
         weight_tensor = state_dict[key]
-        processed_weights = process_weights(weight_tensor, aggregation_strategy, downsampling_rate, splitting_dimensions)
+        processed_weights = process_weights(weight_tensor, aggregation_strategy, splitting_dimensions)
         downsized_state_dict[key] = processed_weights
     return downsized_state_dict
 
-def main():
+def main(args):
+    model_name = args.model_name
+    output_model_name = args.output_model_name
+    hidden_downsampling_rate = args.hidden_downsampling_rate
+    layer_downsampling_rate = args.layer_downsampling_rate
+    aggregation_strategy = args.aggregation_strategy
+    layer_selection_strategy = args.layer_selection_strategy
+    push_to_hub = args.push_to_hub
+    
     config_old_model = BloomConfig.from_pretrained(model_name, use_auth_token=True)
     old_model = BloomModel.from_pretrained(model_name, use_auth_token=True, torch_dtype="auto")
 
-    downsized_config = convert_config_to_downsized_config(config_old_model, downsampling_rate, aggregation_strategy, layer_selection_strategy)
+    downsized_config = convert_config_to_downsized_config(config_old_model, hidden_downsampling_rate, layer_downsampling_rate, aggregation_strategy, layer_selection_strategy)
     downsized_model = BloomModel(downsized_config)
 
     old_model_state_dict = old_model.state_dict()
 
-    mapping_new_keys = select_layers_from_strategy(layer_selection_strategy, config_old_model.n_layer, downsampling_rate)
+    mapping_new_keys = select_layers_from_strategy(layer_selection_strategy, config_old_model.n_layer, layer_downsampling_rate)
     old_model_state_dict = select_keys_from_state_dict(old_model_state_dict, mapping_new_keys)
 
-    downsized_state_dict = downsize_state_dict(old_model_state_dict, downsized_config, downsampling_rate, aggregation_strategy)
+    downsized_state_dict = downsize_state_dict(old_model_state_dict, downsized_config, aggregation_strategy)
     downsized_model.load_state_dict(downsized_state_dict)
 
     if push_to_hub:
-        downsized_config.push_to_hub(output_model_name, revision="{}_{}_{}".format(downsampling_rate, aggregation_strategy, layer_selection_strategy), use_auth_token=True, organization="bigscience")
-        downsized_model.push_to_hub(output_model_name, revision="{}_{}_{}".format(downsampling_rate, aggregation_strategy, layer_selection_strategy), use_auth_token=True, organization="bigscience")
+        downsized_config.push_to_hub(output_model_name, use_auth_token=True, organization="bigscience")
+        downsized_model.push_to_hub(output_model_name, use_auth_token=True, organization="bigscience")
     else:
+        if not os.path.exists(output_model_name):
+            os.makedirs(output_model_name)
         torch.save(downsized_model.state_dict(), os.path.join(output_model_name, 'pytorch_model.bin'))
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description='Downsize a Bloom model to a smaller model')
+    parser.add_argument('--model_name', type=str, default="bigscience/bigscience-small-testing", help='Name of the model to downsize - must be on the Hub')
+    parser.add_argument('--output_model_name', type=str, default="bigscience/bigscience-small-testing-shrinked", help='Name of the output model')
+    parser.add_argument('--hidden_downsampling_rate', type=float, default=0.5, help='Downsampling rate for the hidden layers')
+    parser.add_argument('--layer_downsampling_rate', type=float, default=0.5, help='Downsampling rate for the layers')
+    parser.add_argument('--aggregation_strategy', type=str, default="mean", help='Aggregation strategy for the weights matrices', choices=["mean", "first", "last"])
+    parser.add_argument('--layer_selection_strategy', type=str, default="step", help='Layer selection strategy', choices=["first", "last", "step"])
+    parser.add_argument('--push_to_hub', type=bool, default=False, help='Push the model to the Hub')
+    args = parser.parse_args()
+    main(args)
