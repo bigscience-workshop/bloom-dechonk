@@ -237,6 +237,6 @@ if __name__ == "__main__":
     parser.add_argument('--layer_downsampling_rate', type=float, default=0.5, help='Downsampling rate for the layers')
     parser.add_argument('--aggregation_strategy', type=str, default="mean", help='Aggregation strategy for the weights matrices', choices=["mean", "first", "last"])
     parser.add_argument('--layer_selection_strategy', type=str, default="step", help='Layer selection strategy', choices=["first", "last", "step"])
-    parser.add_argument('--push_to_hub', type=bool, default=False, help='Push the model to the Hub')
+    parser.add_argument('--push_to_hub', action='store_true', help='Push the model to the Hub')
     args = parser.parse_args()
     main(args)
