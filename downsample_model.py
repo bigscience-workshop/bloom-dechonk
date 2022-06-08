@@ -39,7 +39,7 @@ def select_layers_from_strategy(strategy, n_layers, downsampling_rate):
             n_layers (`int`, *required*):
                 total number of layers in the source model
             downsampling_rate (`float`, *required*):
-                width downsampling rate
+                depth downsampling rate
     """
     selecting_rate = int(1/(downsampling_rate))
 
@@ -53,7 +53,7 @@ def select_layers_from_strategy(strategy, n_layers, downsampling_rate):
         raise NotImplementedError("Unknown strategy: {}".format(strategy))
     return {layer:"h."+str(i) for i, layer in enumerate(array_layers)}
 
-def convert_config_to_downsized_config(config, hidden_size_downsampling_rate, width_downsampling_rate, aggregation_strategy, layer_selection_strategy):
+def convert_config_to_downsized_config(config, hidden_size_downsampling_rate, depth_downsampling_rate, aggregation_strategy, layer_selection_strategy):
     """
         Defines the new hyperparameters of the shrinked model, given the downsampling rates.
         Creates a new config file and returns it.
@@ -62,8 +62,8 @@ def convert_config_to_downsized_config(config, hidden_size_downsampling_rate, wi
                 input old model's config
             hidden_downsampling_rate (`float`, *required*):
                 hidden states downsampling rate
-            width_downsampling_rate (`float`, *required*):
-                width downsampling rate
+            depth_downsampling_rate (`float`, *required*):
+                depth downsampling rate
             aggregation_strategy (`str`, *required*):
                 weights matrices aggregation strategy
             layer_selection_strategy (`str`, *required*):
@@ -73,10 +73,10 @@ def convert_config_to_downsized_config(config, hidden_size_downsampling_rate, wi
     
     downsized_config = deepcopy(config)
     downsized_config.hidden_size_downsampling_rate = hidden_size_downsampling_rate
-    downsized_config.width_downsampling_rate = width_downsampling_rate
+    downsized_config.depth_downsampling_rate = depth_downsampling_rate
     
     downsized_config.hidden_size = int(old_hidden_size * hidden_size_downsampling_rate)
-    downsized_config.n_layer = int(old_num_layer * width_downsampling_rate)
+    downsized_config.n_layer = int(old_num_layer * depth_downsampling_rate)
     downsized_config.n_head = int(old_num_heads * hidden_size_downsampling_rate)
 
     downsized_config.weights_aggregation_strategy = aggregation_strategy
@@ -198,35 +198,27 @@ def downsize_state_dict(state_dict, downsized_model_config, aggregation_strategy
     return downsized_state_dict
 
 def main(args):
-    model_name = args.model_name
-    output_model_name = args.output_model_name
-    hidden_downsampling_rate = args.hidden_downsampling_rate
-    layer_downsampling_rate = args.layer_downsampling_rate
-    aggregation_strategy = args.aggregation_strategy
-    layer_selection_strategy = args.layer_selection_strategy
-    push_to_hub = args.push_to_hub
-    
-    config_old_model = BloomConfig.from_pretrained(model_name, use_auth_token=True)
-    old_model = BloomModel.from_pretrained(model_name, use_auth_token=True, torch_dtype="auto")
+    config_old_model = BloomConfig.from_pretrained(args.model_name, use_auth_token=True)
+    old_model = BloomModel.from_pretrained(args.model_name, use_auth_token=True, torch_dtype="auto")
 
-    downsized_config = convert_config_to_downsized_config(config_old_model, hidden_downsampling_rate, layer_downsampling_rate, aggregation_strategy, layer_selection_strategy)
+    downsized_config = convert_config_to_downsized_config(config_old_model, args.hidden_downsampling_rate, args.layer_downsampling_rate, args.aggregation_strategy, args.layer_selection_strategy)
     downsized_model = BloomModel(downsized_config)
 
     old_model_state_dict = old_model.state_dict()
 
-    mapping_new_keys = select_layers_from_strategy(layer_selection_strategy, config_old_model.n_layer, layer_downsampling_rate)
+    mapping_new_keys = select_layers_from_strategy(args.layer_selection_strategy, config_old_model.n_layer, args.layer_downsampling_rate)
     old_model_state_dict = select_keys_from_state_dict(old_model_state_dict, mapping_new_keys)
 
-    downsized_state_dict = downsize_state_dict(old_model_state_dict, downsized_config, aggregation_strategy)
+    downsized_state_dict = downsize_state_dict(old_model_state_dict, downsized_config, args.aggregation_strategy)
     downsized_model.load_state_dict(downsized_state_dict)
 
-    if push_to_hub:
-        downsized_config.push_to_hub(output_model_name, use_auth_token=True, organization="bigscience")
-        downsized_model.push_to_hub(output_model_name, use_auth_token=True, organization="bigscience")
+    if args.push_to_hub:
+        downsized_config.push_to_hub(args.output_model_name, use_auth_token=True, organization="bigscience")
+        downsized_model.push_to_hub(args.output_model_name, use_auth_token=True, organization="bigscience")
     else:
-        if not os.path.exists(output_model_name):
-            os.makedirs(output_model_name)
-        torch.save(downsized_model.state_dict(), os.path.join(output_model_name, 'pytorch_model.bin'))
+        if not os.path.exists(args.output_model_name):
+            os.makedirs(args.output_model_name)
+        torch.save(downsized_model.state_dict(), os.path.join(args.output_model_name, 'pytorch_model.bin'))
 
 
 if __name__ == "__main__":
