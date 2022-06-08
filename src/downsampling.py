@@ -24,9 +24,9 @@ def select_layers_from_strategy(strategy, n_layers, downsampling_rate):
                 h.0 | h.1 | ... | h.30
             Target Model:
                 if strategy = 'first':
-                    returns {h.0:h.0, h.1:h.1, ... h.14:h.14} (consider half of the layers)
+                    returns {h.0:h.0, h.1:h.1, ... h.14:h.14} (consider the first half of the layers)
                 if strategy = 'last':
-                    returns {h.15:h.0, h.16:h.0, ... , h.30:h.14}
+                    returns {h.15:h.0, h.16:h.0, ... , h.30:h.14} (consider the second half of the layers
                     So h.15 of the source model will correspond to h.0 in the target model, etc.
                 if strategy = 'step':
                     returns {h.0:h.0, h.2:h.1, h.4:h.0, ... , h.30:h.14}
