@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # coding=utf-8
 
+import sklearn
+import torch
 
 import logging
 import math
@@ -10,8 +12,7 @@ import sys
 import datasets
 import transformers
 from datasets import load_metric
-from transformers import (AutoTokenizer, HfArgumentParser, TrainingArguments, default_data_collator,
-                          is_torch_tpu_available, set_seed)
+from transformers import AutoTokenizer, HfArgumentParser, TrainingArguments, is_torch_tpu_available, set_seed
 from transformers.trainer_utils import get_last_checkpoint
 
 import src.overrides
@@ -85,8 +86,9 @@ def main():
         model_args.tokenizer_name, cache_dir=model_args.cache_dir, use_fast=model_args.use_fast_tokenizer
     )
     model = transformers.AutoModelForCausalLM.from_pretrained(model_args.model_name)
+    model.gradient_checkpointing_enable()
 
-    lm_datasets = get_tokenized_lm_datasets(tokenizer, model_args.cache_dir, data_args, training_args)
+    lm_datasets, data_collator = get_tokenized_lm_datasets(tokenizer, model_args.cache_dir, data_args, training_args)
 
     if training_args.do_train:
         if "train" not in lm_datasets:
@@ -124,7 +126,7 @@ def main():
         eval_subset_size=data_args.eval_subset_size,
         tokenizer=tokenizer,
         # Data collator will default to DataCollatorWithPadding, so we change it.
-        data_collator=default_data_collator,
+        data_collator=data_collator,
         compute_metrics=compute_metrics if training_args.do_eval and not is_torch_tpu_available() else None,
         preprocess_logits_for_metrics=preprocess_logits_for_metrics
         if training_args.do_eval and not is_torch_tpu_available()
