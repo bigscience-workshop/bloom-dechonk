@@ -106,7 +106,8 @@ pip install --no-input \
 # transformers bloom dev branch
 pip install https://github.com/younesbelkada/transformers/archive/ba1d9fc05fda160bda968cc77c4c5dbb21049aa9.zip
 pip install datasets==2.2.2 accelerate==0.9.0
-DS_BUILD_CPU_ADAM=1 DS_BUILD_AIO=1 DS_BUILD_UTILS=1 pip install deepspeed --global-option="build_ext" --global-option="-j8" --no-cache -v --disable-pip-version-check
+DS_BUILD_CPU_ADAM=1 DS_BUILD_AIO=1 DS_BUILD_UTILS=1 pip install deepspeed==0.6.5 \
+ --global-option="build_ext" --global-option="-j8" --no-cache -v --disable-pip-version-check
 
 # domain-specific ML libs
 pip install \

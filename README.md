@@ -25,7 +25,8 @@ from transformers.
 The code requires recent datasets and a development version of Transformers that implements the Bloom model:
 ```
 pip install https://github.com/younesbelkada/transformers/archive/ba1d9fc05fda160bda968cc77c4c5dbb21049aa9.zip
-pip install datasets==2.2.2 accelerate==0.9.0 deepspeed==0.6.5
+pip install datasets==2.2.2 accelerate==0.9.0
+DS_BUILD_CPU_ADAM=1 DS_BUILD_AIO=1 DS_BUILD_UTILS=1 pip install deepspeed==0.6.5 --global-option="build_ext" --global-option="-j8" --no-cache -v --disable-pip-version-check
 ```
 
 The full installation script can be found in [env.sh](./env.sh). It assumes clean ubuntu/debian installation and runs.
@@ -69,9 +70,9 @@ __Note:__ depending on your training hardware, you may need to modify `ds_config
 The default settings roughly correspond to zero-2.
 
 The default training hyperparameters were adapted from https://huggingface.co/bigscience/tr11f-6B3-logs/tensorboard?scroll=1#text
- except learning rate and warmup steps, which were chosen based on model's learning rate during initial checkpoint  
- this code assumes 8 gpus. For a different setup, change gradient_accumulation_steps or  per_device_train_batch_size
- to get the global batch size of 512 sequences or 2^20 (~1M) tokens 
+except learning rate and warmup steps, which were chosen based on model's learning rate during initial checkpoint 
+this code assumes 8 gpus. For a different setup, change gradient_accumulation_steps or  per_device_train_batch_size
+to get the global batch size of 512 sequences or 2^20 (~1M) tokens 
 
 
 # Model shrinking code
