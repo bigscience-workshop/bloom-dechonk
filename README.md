@@ -48,14 +48,9 @@ tokenizer.save_pretrained("./some/folder")
 
 Then, run the training script using the following command 
 ```bash
+export RUN_NAME=TODO_EXP_NAME_HERE
 export INPUT_PATH=. SNAPSHOT_PATH=./snapshots LOGS_PATH=./logs OMP_NUM_THREADS=32
-export DATASET_NAME_OR_PATH=TODO DATASET_CONFIG_NAME=TODO RUN_NAME=EXP_NAME_HERE
-export INITIAL_MODEL_PATH=./some_folder
-
-# training hyperparameters were adapted from https://huggingface.co/bigscience/tr11f-6B3-logs/tensorboard?scroll=1#text
-# except learning rate and warmup steps, which were chosen based on model's learning rate during initial checkpoint
-# this code assumes 8 gpus. For a different setup, change gradient_accumulation_steps or  per_device_train_batch_size
-# to get the global batch size of 512 sequences or 2^20 (~1M) tokens 
+export DATASET_NAME_OR_PATH=TODO DATASET_CONFIG_NAME=TODO INITIAL_MODEL_PATH=./some_folder
 
 deepspeed --num_gpus 8 ./run_clm.py --do_train --do_eval \
     --model_name $INITIAL_MODEL_PATH --tokenizer_name $INITIAL_MODEL_PATH \
@@ -72,6 +67,12 @@ deepspeed --num_gpus 8 ./run_clm.py --do_train --do_eval \
 
 __Note:__ depending on your training hardware, you may need to modify `ds_config.json` to enable zero-3 or offloading.
 The default settings roughly correspond to zero-2.
+
+The default training hyperparameters were adapted from https://huggingface.co/bigscience/tr11f-6B3-logs/tensorboard?scroll=1#text
+ except learning rate and warmup steps, which were chosen based on model's learning rate during initial checkpoint  
+ this code assumes 8 gpus. For a different setup, change gradient_accumulation_steps or  per_device_train_batch_size
+ to get the global batch size of 512 sequences or 2^20 (~1M) tokens 
+
 
 # Model shrinking code
 
