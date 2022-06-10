@@ -60,10 +60,10 @@ deepspeed --num_gpus 8 ./run_clm.py --do_train --do_eval \
     --block_size 2048 --per_device_train_batch_size 4 --per_device_eval_batch_size 4 --gradient_accumulation_steps 16 \
     --learning_rate 0.00008 --max_grad_norm 1.0 --lr_scheduler_type cosine --max_steps 31250 --warmup_steps 1000 \
     --adam_epsilon 1e-8 --weight_decay 0.1 --adam_beta1 0.9 --adam_beta2 0.95 --fp16=True --seed 42 \
-    --cache_dir $INPUT_PATH/data/cache --output_dir $SNAPSHOT_PATH --resume_from_checkpoint \
+    --cache_dir $INPUT_PATH/data/cache --output_dir $SNAPSHOT_PATH --overwrite_output_dir=True \
     --logging_dir $LOGS_PATH --report_to tensorboard --logging_first_step --logging_steps 100 \
     --evaluation_strategy steps --eval_steps 100 --prediction_loss_only --eval_subset_size 512 \
-    --save_steps 500 --save_total_limit 2 --dataloader_num_workers 4 --deepspeed ds_config.json
+    --save_steps 500 --save_total_limit 2 --dataloader_num_workers 8 --deepspeed ds_config.json
 
 ```
 

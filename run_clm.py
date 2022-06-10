@@ -68,8 +68,9 @@ def main():
     last_checkpoint = None
     try:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        logger.info(f"Found previous checkpoint {last_checkpoint}.")
     except:
-        pass
+        logger.info("Did not find previous checkpoint.")
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
         if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
             raise ValueError(
@@ -143,7 +144,7 @@ def main():
             checkpoint = training_args.resume_from_checkpoint
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
-        print("!!"*5, checkpoint, last_checkpoint, training_args.resume_from_checkpoint)
+
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         trainer.save_model()  # Saves the tokenizer too for easy upload
 
