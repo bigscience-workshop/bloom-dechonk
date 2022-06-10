@@ -8,8 +8,11 @@ class ModelArguments:
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune, or train from scratch.
     """
 
-    model_name: str = field(metadata={"help": "Pretrained config name or path if not the same as model_name"})
     tokenizer_name: str = field(metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"})
+    model_name: Optional[str] = field(default=None, metadata={
+        "help": "Initial model weights: either a name for HF hub or a local path. Specify either this or config_name"})
+    config_name: Optional[str] = field(default=None, metadata={
+        "help": "Model config: either a name for HF hub or a path to a local .json. Specify either this or model_name"})
     cache_dir: Optional[str] = field(
         default=None,
         metadata={"help": "Where do you want to store the pretrained models downloaded from huggingface.co"},
