@@ -7,7 +7,6 @@ apt-get install -y --allow-unauthenticated --no-install-recommends software-prop
 curl -sSL \
 'http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x7FCD11186050CD1A' \
 | apt-key add -
-# apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 7FCD11186050CD1A
 apt-get purge -y gnupg2
 add-apt-repository -y -n ppa:ubuntu-toolchain-r/test
 

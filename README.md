@@ -8,8 +8,8 @@ A repo for running model shrinking experiments.
 * Training logs & config for base model ([tr11f-6B3-logs](https://huggingface.co/bigscience/tr11f-6B3-logs/tensorboard))
 * The training code is based on [run_clm.py](https://github.com/huggingface/transformers/blob/main/examples/pytorch/language-modeling/run_clm.py)
 from transformers.
-* [Todo: link to full train&val dataset on bigscience or -- copy from bigscience-catalogue-lm-data]
 * [Todo: a link to public tensorboard logs]
+* [Todo: link to full train&val dataset on bigscience or -- copy from bigscience-catalogue-lm-data]
 * [Todo: a list of model downsizing scripts]
 * [Todo: link do discussion threads suggested during last call]
 
@@ -26,7 +26,8 @@ The code requires recent datasets and a development version of Transformers that
 ```
 pip install https://github.com/younesbelkada/transformers/archive/ba1d9fc05fda160bda968cc77c4c5dbb21049aa9.zip
 pip install datasets==2.2.2 accelerate==0.9.0
-DS_BUILD_CPU_ADAM=1 DS_BUILD_AIO=1 DS_BUILD_UTILS=1 pip install deepspeed==0.6.5 --global-option="build_ext" --global-option="-j8" --no-cache -v --disable-pip-version-check
+DS_BUILD_CPU_ADAM=1 DS_BUILD_AIO=1 DS_BUILD_UTILS=1 pip install deepspeed==0.6.5 \
+  --global-option="build_ext" --global-option="-j8" --no-cache -v --disable-pip-version-check
 ```
 
 The full installation script can be found in [env.sh](./env.sh). It assumes clean ubuntu/debian installation and runs.
@@ -58,11 +59,11 @@ deepspeed --num_gpus 8 ./run_clm.py --do_train --do_eval \
     --dataset_name $DATASET_NAME_OR_PATH --dataset_config_name $DATASET_CONFIG_NAME --run_name $RUN_NAME \
     --block_size 2048 --per_device_train_batch_size 4 --per_device_eval_batch_size 4 --gradient_accumulation_steps 16 \
     --learning_rate 0.00008 --max_grad_norm 1.0 --lr_scheduler_type cosine --max_steps 31250 --warmup_steps 1000 \
-    --adam_epsilon 1e-8 --weight_decay 0.1 --adam_beta1 0.9 --adam_beta2 0.95 --fp16=True \
-    --ddp_find_unused_parameters 0 --cache_dir $INPUT_PATH/data/cache --output_dir $SNAPSHOT_PATH --overwrite_output_dir=True \
+    --adam_epsilon 1e-8 --weight_decay 0.1 --adam_beta1 0.9 --adam_beta2 0.95 --fp16=True --seed 42 \
+    --cache_dir $INPUT_PATH/data/cache --output_dir $SNAPSHOT_PATH --resume_from_checkpoint \
     --logging_dir $LOGS_PATH --report_to tensorboard --logging_first_step --logging_steps 100 \
     --evaluation_strategy steps --eval_steps 100 --prediction_loss_only --eval_subset_size 512 \
-    --save_steps 500 --save_total_limit 2 --seed 42 --dataloader_num_workers 4 --deepspeed ds_config.json
+    --save_steps 500 --save_total_limit 2 --dataloader_num_workers 4 --deepspeed ds_config.json
 
 ```
 
