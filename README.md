@@ -8,10 +8,10 @@ A repo for running model shrinking experiments.
 * Training logs & config for base model ([tr11f-6B3-logs](https://huggingface.co/bigscience/tr11f-6B3-logs/tensorboard))
 * The training code is based on [run_clm.py](https://github.com/huggingface/transformers/blob/main/examples/pytorch/language-modeling/run_clm.py)
 from transformers.
-* [Todo: a link to public tensorboard logs]
-* [Todo: link to full train&val dataset on bigscience or -- copy from bigscience-catalogue-lm-data]
-* [Todo: a list of model downsizing scripts]
-* [Todo: link do discussion threads suggested during last call]
+* [__[public tensorboard with logs]__](https://huggingface.co/bigscience/dechonk-logs-1/tensorboard) - updated every 8 hours
+* [just in case] Cluster-specific script for updating tensorboard every 8 hours - [__[here]__](https://gist.github.com/justheuristic/ff549f7f6e0006469aa31bdcdcbb8855)
+* [Todo:] a list of model downsizing scripts - after merging https://github.com/bigscience-workshop/bloom-dechonk/pull/1
+* [Todo:] link to relevant discussion threads
 
 ### Known issues:
 * warmup steps and total steps in the training script (below) were chosen by a random guess, they may be suboptimal,  
