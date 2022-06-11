@@ -1,30 +1,21 @@
 {
     "fp16": {
-        "enabled": true,
+        "enabled": "auto",
         "loss_scale": 0,
         "loss_scale_window": 1000,
         "initial_scale_power": 16,
         "hysteresis": 2,
         "min_loss_scale": 1
     },
-
     "zero_optimization": {
-        "stage": 2,
-        "cpu_offload": false,
-        "cpu_offload_params": false,
-        "cpu_offload_use_pin_memory" : false,
+        "stage": 1,
+        "allgather_partitions": true,
+        "allgather_bucket_size": 2e8,
+        "reduce_scatter": true,
+        "reduce_bucket_size": 2e8,
         "overlap_comm": true,
-        "contiguous_gradients": true,
-        "stage3_max_live_parameters": 1e9,
-        "stage3_max_reuse_distance": 1e9,
-        "stage3_prefetch_bucket_size": 0.94e6,
-        "stage3_param_persistence_threshold": 1e4,
-        "reduce_bucket_size": 1e6,
-        "prefetch_bucket_size": 3e6,
-        "sub_group_size": 1e14,
-        "stage3_gather_fp16_weights_on_model_save": true
-    },
-
+        "contiguous_gradients": true
+  },
     "steps_per_print": 2000,
     "wall_clock_breakdown": false,
     "train_batch_size": "auto"

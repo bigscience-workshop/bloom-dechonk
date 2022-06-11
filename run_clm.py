@@ -89,7 +89,15 @@ def main():
     tokenizer = transformers.AutoTokenizer.from_pretrained(
         model_args.tokenizer_name, cache_dir=model_args.cache_dir, use_fast=model_args.use_fast_tokenizer
     )
-    model = transformers.AutoModelForCausalLM.from_pretrained(model_args.model_name)
+
+    if model_args.model_name is not None:
+        assert model_args.config_name is None, "Please specify either --model_name or --config_name, but not both"
+        model = transformers.AutoModelForCausalLM.from_pretrained(model_args.model_name)
+    else:
+        assert model_args.config_name is not None, "Please specify either --model_name or --config_name, but not both"
+        config = transformers.AutoConfig.from_pretrained(model_args.config_name)
+        model = transformers.AutoModelForCausalLM.from_config(config)
+
     model.gradient_checkpointing_enable()
 
     lm_datasets, data_collator = get_tokenized_lm_datasets(tokenizer, model_args.cache_dir, data_args, training_args)
@@ -104,7 +112,7 @@ def main():
             raise ValueError("--do_eval requires a validation dataset")
         eval_dataset = lm_datasets["validation"]
 
-        def preprocess_logits_for_metrics(logits, labels):
+        def preprocess_logits_for_metrics(logits, _unused_labels):
             if isinstance(logits, tuple):
                 # Depending on the model and config, logits may contain extra tensors,
                 # like past_key_values, but logits always come first
