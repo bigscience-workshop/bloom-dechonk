@@ -78,4 +78,26 @@ to get the global batch size of 512 sequences or 2^20 (~1M) tokens
 
 # Model shrinking code
 
-[TODO]
+The code requires recent datasets and a development version of Transformers that implements the Bloom model:
+```
+pip install https://github.com/younesbelkada/transformers/archive/ba1d9fc05fda160bda968cc77c4c5dbb21049aa9.zip
+```
+Once you have these dependencies you should be able to shrink any Bloom Model by using these arguments from the function `downsample_model.py`:
+| Parameter                 |Description   |
+| :------------------------ |:-------------|
+| ```--model_name``` | Name of the model to downsize - must be on the Hub |
+| ```--output_model_name```  | Name of the output model - Will be used to push it on the Hub or sve it locally |
+| ```--hidden_downsampling_rate```  | Downsampling rate of the hidden dimension|
+| ```--layer_downsampling_rate```  | Downsampling rate of the attention blocks|
+| ```--aggregation_strategy```  | Aggregation strategy of the weights matrices - must be in [`first` `last`, `mean`]|
+| ```--layer_selection_strategy```  | Layer selection strategy of the attention layers - must be in [`first` `last`, `step`]|
+| ```--push_to_hub```  | Flag enabling pushing the shrinked the model on the Hub. It will push the model under the `bigscience` organization with the name `output_model_name` |
+
+Then run:
+```bash
+python downsample_model.py \
+    --model_name [MODEL_NAME] --output_model_name [OUTPUT_MODEL_NAME] \
+    --hidden_downsampling_rate [HIDDEN_DOWNSAMPLING_RATE] --layer_downsampling_rate [LAYER_DOWNSAMPLING_RATE] \
+    --aggregation_strategy [AGGREGATION_STRATEGY] --layer_selection_strategy [LAYER_SELECTION_STRATEGY] \
+    [--push_to_hub]
+```
