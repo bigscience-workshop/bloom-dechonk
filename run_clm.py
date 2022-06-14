@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # coding=utf-8
 
+import sklearn
+import torch
 
 import logging
 import math
@@ -10,8 +12,7 @@ import sys
 import datasets
 import transformers
 from datasets import load_metric
-from transformers import (AutoTokenizer, HfArgumentParser, TrainingArguments, default_data_collator,
-                          is_torch_tpu_available, set_seed)
+from transformers import AutoTokenizer, HfArgumentParser, TrainingArguments, is_torch_tpu_available, set_seed
 from transformers.trainer_utils import get_last_checkpoint
 
 import src.overrides
@@ -65,8 +66,12 @@ def main():
 
     # Detecting last checkpoint.
     last_checkpoint = None
-    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
+    try:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        logger.info(f"Found previous checkpoint {last_checkpoint}.")
+    except:
+        logger.info("Did not find previous checkpoint.")
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
         if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
             raise ValueError(
                 f"Output directory ({training_args.output_dir}) already exists and is not empty. "
@@ -84,9 +89,18 @@ def main():
     tokenizer = transformers.AutoTokenizer.from_pretrained(
         model_args.tokenizer_name, cache_dir=model_args.cache_dir, use_fast=model_args.use_fast_tokenizer
     )
-    model = transformers.AutoModelForCausalLM.from_pretrained(model_args.model_name)
 
-    lm_datasets = get_tokenized_lm_datasets(tokenizer, model_args.cache_dir, data_args, training_args)
+    if model_args.model_name is not None:
+        assert model_args.config_name is None, "Please specify either --model_name or --config_name, but not both"
+        model = transformers.AutoModelForCausalLM.from_pretrained(model_args.model_name)
+    else:
+        assert model_args.config_name is not None, "Please specify either --model_name or --config_name, but not both"
+        config = transformers.AutoConfig.from_pretrained(model_args.config_name)
+        model = transformers.AutoModelForCausalLM.from_config(config)
+
+    model.gradient_checkpointing_enable()
+
+    lm_datasets, data_collator = get_tokenized_lm_datasets(tokenizer, model_args.cache_dir, data_args, training_args)
 
     if training_args.do_train:
         if "train" not in lm_datasets:
@@ -98,7 +112,7 @@ def main():
             raise ValueError("--do_eval requires a validation dataset")
         eval_dataset = lm_datasets["validation"]
 
-        def preprocess_logits_for_metrics(logits, labels):
+        def preprocess_logits_for_metrics(logits, _unused_labels):
             if isinstance(logits, tuple):
                 # Depending on the model and config, logits may contain extra tensors,
                 # like past_key_values, but logits always come first
@@ -124,7 +138,7 @@ def main():
         eval_subset_size=data_args.eval_subset_size,
         tokenizer=tokenizer,
         # Data collator will default to DataCollatorWithPadding, so we change it.
-        data_collator=default_data_collator,
+        data_collator=data_collator,
         compute_metrics=compute_metrics if training_args.do_eval and not is_torch_tpu_available() else None,
         preprocess_logits_for_metrics=preprocess_logits_for_metrics
         if training_args.do_eval and not is_torch_tpu_available()
@@ -138,6 +152,7 @@ def main():
             checkpoint = training_args.resume_from_checkpoint
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
+
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
         trainer.save_model()  # Saves the tokenizer too for easy upload
 

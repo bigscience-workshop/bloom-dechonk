@@ -8,6 +8,7 @@ import torch.utils.data
 import transformers.utils.logging
 from transformers import TrainingArguments
 from transformers.testing_utils import CaptureLogger
+from transformers import DataCollatorForLanguageModeling
 
 import src.overrides
 from src.arguments import DataTrainingArguments
@@ -38,7 +39,7 @@ def get_tokenized_lm_datasets(tokenizer, cache_dir, data_args: DataTrainingArgum
         raw_datasets = src.overrides.load_raw_shuffled_datasets(
             data_args.dataset_name, data_args.dataset_config_name, cache_dir=cache_dir
         )
-    assert len(raw_datasets.keys()) == 2 and "train" in raw_datasets.keys() and "validation" in raw_datasets.keys()
+    assert "train" in raw_datasets.keys() and "validation" in raw_datasets.keys()
 
     # Preprocessing the datasets.
     # First we tokenize all the texts.
@@ -111,7 +112,7 @@ def get_tokenized_lm_datasets(tokenizer, cache_dir, data_args: DataTrainingArgum
             for key, dataset in tokenized_datasets.items()
         }
 
-    return lm_datasets
+    return lm_datasets, DataCollatorForLanguageModeling(tokenizer, mlm=False, pad_to_multiple_of=block_size)
 
 
 class WrappedIterableDataset(torch.utils.data.IterableDataset):
