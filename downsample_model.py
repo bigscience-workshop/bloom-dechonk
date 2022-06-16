@@ -2,16 +2,16 @@ import argparse
 import os
 
 import torch
-from transformers import BloomConfig, BloomModel
+from transformers import BloomConfig, BloomForCausalLM
 
 from src.downsampling import convert_config_to_downsized_config, select_layers_from_strategy, select_keys_from_state_dict, downsize_state_dict
 
 def main(args):
     config_old_model = BloomConfig.from_pretrained(args.model_name, use_auth_token=True)
-    old_model = BloomModel.from_pretrained(args.model_name, use_auth_token=True, torch_dtype="auto")
+    old_model = BloomForCausalLM.from_pretrained(args.model_name, use_auth_token=True)
 
     downsized_config = convert_config_to_downsized_config(config_old_model, args.hidden_downsampling_rate, args.layer_downsampling_rate, args.aggregation_strategy, args.layer_selection_strategy)
-    downsized_model = BloomModel(downsized_config)
+    downsized_model = BloomForCausalLM(downsized_config)
 
     old_model_state_dict = old_model.state_dict()
 
