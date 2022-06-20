@@ -31,6 +31,8 @@ def select_layers_from_strategy(strategy, n_layers, downsampling_rate):
                 if strategy = 'step':
                     returns {h.0:h.0, h.2:h.1, h.4:h.0, ... , h.30:h.14}
                     We consider the layers of the source model with a step of 1/downsample_rate
+                if strategy = 'mean':
+                    returns {(h.0, h.1, ..., h.n):h.0, ...} with n = 1/downsample_rate
         Args:
             strategy (`str`, *required*):
                 layer selection strategy, must be `first`, `last` or `step` (see comments above)
@@ -47,6 +49,8 @@ def select_layers_from_strategy(strategy, n_layers, downsampling_rate):
         array_layers = ["h."+str(i) for i in range(int(n_layers//selecting_rate), n_layers)]
     elif strategy == "step":
         array_layers = ["h."+str(i) for i in range(n_layers) if i % int(selecting_rate) == 0]
+    elif strategy == "mean":
+        array_layers = [tuple("h."+str(j) for j in range(i, i+int(selecting_rate))) for i in range(n_layers) if i % int(selecting_rate) == 0]
     else:
         raise NotImplementedError("Unknown strategy: {}".format(strategy))
     return {layer:"h."+str(i) for i, layer in enumerate(array_layers)}
@@ -107,9 +111,17 @@ def select_keys_from_state_dict(state_dict, dict_layers):
     for key in state_dict.keys():
         if key.startswith("h."):
             prefix = ".".join(key.split('.')[:2])
-            if prefix in dict_layers.keys():
-                new_key = key.replace(prefix, dict_layers[prefix])
-                processed_state_dict[new_key] = state_dict[key]
+            if not isinstance(list(dict_layers.keys())[0], tuple): # check if we are not averaging
+                if prefix in dict_layers.keys():
+                    new_key = key.replace(prefix, dict_layers[prefix])
+                    processed_state_dict[new_key] = state_dict[key]
+            else:
+                for tuple_key in dict_layers.keys():
+                    if prefix in tuple_key:
+                        new_key = key.replace(prefix, dict_layers[tuple_key])
+                        if new_key not in processed_state_dict.keys():
+                            averaged_weights = torch.mean(torch.stack(tuple(state_dict[key.replace(prefix, tuple_prefix)] for tuple_prefix in tuple_key)), dim=0)
+                            processed_state_dict[new_key] = averaged_weights
         else:
             processed_state_dict[key] = state_dict[key]
     return processed_state_dict
