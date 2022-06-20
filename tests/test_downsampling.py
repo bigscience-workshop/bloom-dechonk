@@ -23,10 +23,12 @@ class BloomShrinkingTest(unittest.TestCase):
         expected_first = {"h.0":"h.0", "h.1":"h.1", "h.2":"h.2"}
         expected_last = {"h.3":"h.0", "h.4":"h.1", "h.5":"h.2"}
         expected_step = {"h.0":"h.0", "h.2":"h.1", "h.4":"h.2"}
+        expected_mean = {('h.0', 'h.1'): 'h.0', ('h.2', 'h.3'): 'h.1', ('h.4', 'h.5'): 'h.2'}
         strategies_to_test = {
             "first":expected_first,
             "last":expected_last,
             "step":expected_step,
+            "mean":expected_mean,
         }
         for strategy in strategies_to_test.keys():
             self.assertDictEqual(select_layers_from_strategy(strategy, self.n_layers, self.depth_downsampling_rate), strategies_to_test[strategy])
