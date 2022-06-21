@@ -22,6 +22,11 @@ def main(args):
     downsized_state_dict = downsize_state_dict(old_model_state_dict, downsized_config, args.aggregation_strategy)
     downsized_model.transformer.load_state_dict(downsized_state_dict)
 
+    with torch.no_grad():
+        assert downsized_model.lm_head.weight.shape == downsized_model.transformer.word_embeddings.weight.shape
+        downsized_model.lm_head.weight.data[...] = downsized_model.transformer.word_embeddings.weight.data
+        downsized_model.lm_head.bias.data[...] = old_model.lm_head.bias  # shape: [vocab_size], no downsampling needed
+
     if args.push_to_hub:
         downsized_config.push_to_hub(args.output_model_name, use_auth_token=True, organization="bigscience")
         downsized_model.push_to_hub(args.output_model_name, use_auth_token=True, organization="bigscience")
