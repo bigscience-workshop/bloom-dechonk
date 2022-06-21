@@ -32,9 +32,7 @@ def main(args):
         downsized_config.push_to_hub(args.output_model_name, use_auth_token=True, organization="bigscience")
         downsized_model.push_to_hub(args.output_model_name, use_auth_token=True, organization="bigscience")
     else:
-        if not os.path.exists(args.output_model_name):
-            os.makedirs(args.output_model_name)
-        torch.save(downsized_model.state_dict(), os.path.join(args.output_model_name, 'pytorch_model.bin'))
+        downsized_model.save_pretrained(args.output_model_name)
 
 
 if __name__ == "__main__":
