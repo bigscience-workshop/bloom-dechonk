@@ -1,5 +1,4 @@
-import argparse
-import os
+import math
 from copy import deepcopy
 
 import torch
@@ -41,16 +40,19 @@ def select_layers_from_strategy(strategy, n_layers, downsampling_rate):
             downsampling_rate (`float`, *required*):
                 depth downsampling rate
     """
-    selecting_rate = int(1/(downsampling_rate))
-
     if strategy == "first":
-        array_layers = ["h."+str(i) for i in range(n_layers//selecting_rate)]
+        array_layers = ["h."+str(i) for i in range(int(round(n_layers * downsampling_rate)))]
     elif strategy == "last":
-        array_layers = ["h."+str(i) for i in range(int(n_layers//selecting_rate), n_layers)]
+        array_layers = ["h."+str(i) for i in range(n_layers - int(round(n_layers * downsampling_rate)), n_layers)]
     elif strategy == "step":
-        array_layers = ["h."+str(i) for i in range(n_layers) if i % int(selecting_rate) == 0]
+        array_layers = ["h."+str(i) for i in range(n_layers)
+                        if int(math.floor(i * downsampling_rate)) != int(math.floor((i - 1) * downsampling_rate))]
     elif strategy == "mean":
-        array_layers = [tuple("h."+str(j) for j in range(i, i+int(selecting_rate))) for i in range(n_layers) if i % int(selecting_rate) == 0]
+        slices = [i for i in range(n_layers)
+                   if int(math.floor(i * downsampling_rate)) != int(math.floor((i - 1) * downsampling_rate))]
+        slices.append(n_layers)
+        array_layers = [tuple("h."+str(j) for j in range(slices[i], slices[i + 1]))
+                        for i in range(len(slices) - 1)]
     else:
         raise NotImplementedError("Unknown strategy: {}".format(strategy))
     return {layer:"h."+str(i) for i, layer in enumerate(array_layers)}
@@ -78,7 +80,7 @@ def convert_config_to_downsized_config(config, hidden_size_downsampling_rate, de
     downsized_config.depth_downsampling_rate = depth_downsampling_rate
     
     downsized_config.hidden_size = int(old_hidden_size * hidden_size_downsampling_rate)
-    downsized_config.n_layer = int(old_num_layer * depth_downsampling_rate)
+    downsized_config.n_layer = len(select_layers_from_strategy(layer_selection_strategy, old_num_layer, depth_downsampling_rate))
     downsized_config.n_head = int(old_num_heads * hidden_size_downsampling_rate)
 
     downsized_config.weights_aggregation_strategy = aggregation_strategy

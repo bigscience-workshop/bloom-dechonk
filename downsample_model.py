@@ -8,18 +8,19 @@ from src.downsampling import convert_config_to_downsized_config, select_layers_f
 
 def main(args):
     config_old_model = BloomConfig.from_pretrained(args.model_name, use_auth_token=True)
-    old_model = BloomForCausalLM.from_pretrained(args.model_name, use_auth_token=True)
-
     downsized_config = convert_config_to_downsized_config(config_old_model, args.hidden_downsampling_rate, args.layer_downsampling_rate, args.aggregation_strategy, args.layer_selection_strategy)
+    print("Downsized model config:", downsized_config)
+
+    old_model = BloomForCausalLM.from_pretrained(args.model_name, use_auth_token=True)
     downsized_model = BloomForCausalLM(downsized_config)
 
-    old_model_state_dict = old_model.state_dict()
+    old_model_state_dict = old_model.transformer.state_dict()
 
     mapping_new_keys = select_layers_from_strategy(args.layer_selection_strategy, config_old_model.n_layer, args.layer_downsampling_rate)
     old_model_state_dict = select_keys_from_state_dict(old_model_state_dict, mapping_new_keys)
 
     downsized_state_dict = downsize_state_dict(old_model_state_dict, downsized_config, args.aggregation_strategy)
-    downsized_model.load_state_dict(downsized_state_dict)
+    downsized_model.transformer.load_state_dict(downsized_state_dict)
 
     if args.push_to_hub:
         downsized_config.push_to_hub(args.output_model_name, use_auth_token=True, organization="bigscience")
