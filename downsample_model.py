@@ -25,7 +25,8 @@ def main(args):
     with torch.no_grad():
         assert downsized_model.lm_head.weight.shape == downsized_model.transformer.word_embeddings.weight.shape
         downsized_model.lm_head.weight.data[...] = downsized_model.transformer.word_embeddings.weight.data
-        downsized_model.lm_head.bias.data[...] = old_model.lm_head.bias  # shape: [vocab_size], no downsampling needed
+        if downsized_model.lm_head.bias is not None:
+            downsized_model.lm_head.bias.data[...] = old_model.lm_head.bias  # shape: [vocab_size], no downsampling
 
     if args.push_to_hub:
         downsized_config.push_to_hub(args.output_model_name, use_auth_token=True, organization="bigscience")
