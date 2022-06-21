@@ -90,7 +90,7 @@ Once you have these dependencies you should be able to shrink any Bloom Model by
 | ```--hidden_downsampling_rate```  | Downsampling rate of the hidden dimension|
 | ```--layer_downsampling_rate```  | Downsampling rate of the attention blocks|
 | ```--aggregation_strategy```  | Aggregation strategy of the weights matrices - must be in [`first` `last`, `mean`]|
-| ```--layer_selection_strategy```  | Layer selection strategy of the attention layers - must be in [`first` `last`, `step`]|
+| ```--layer_selection_strategy```  | Layer selection strategy of the attention layers - must be in [`first` `last`, `step`, `mean`]|
 | ```--push_to_hub```  | Flag enabling pushing the shrinked the model on the Hub. It will push the model under the `bigscience` organization with the name `output_model_name` |
 
 Then run:
